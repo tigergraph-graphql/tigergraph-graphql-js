@@ -100,14 +100,14 @@ class TGSchema {
             let edgeName = edge.Name;
             let fromVertexType = edge.ToVertexTypeName;
             let toVertexType = edge.FromVertexTypeName;
-            this.vertexTypeInEdge[edgeName] = {'from_id_type': this.verticesObjectsDict[fromVertexType], 'to_id_type': this.verticesObjectsDict[toVertexType]};
+            this.vertexTypeInEdge[edgeName] = {'from_id_type': this.verticesObjectsDict[fromVertexType].getFields()['v_id']['type'], 'to_id_type': this.verticesObjectsDict[toVertexType].getFields()['v_id']['type']};
             fields['e_type'] = { type: GraphQLString };
             fields['directed'] = { type: GraphQLBasicTypeMapper('BOOL') };
             //!!! id type could not be GraphQLString
             fields['from_type'] = { type: GraphQLString };
-            fields['from_id'] = { type: this.verticesObjectsDict[fromVertexType] };
+            fields['from_id'] = { type: this.verticesObjectsDict[fromVertexType].getFields()['v_id']['type'] };
             //!!! id type could not be GraphQLString
-            fields['to_id'] = { type: this.verticesObjectsDict[toVertexType] };
+            fields['to_id'] = { type: this.verticesObjectsDict[toVertexType].getFields()['v_id']['type'] };
             fields['to_type'] = { type: GraphQLString };
             if (edge.Attributes === undefined || edge.Attributes.length !== 0) {
                 fields['attributes'] = { type: this.createAttributesType(edgeName, edge.Attributes) };
