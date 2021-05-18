@@ -8,19 +8,6 @@ const schema = generateGraphSchema(cred.HOST, cred.GRAPH, cred.USERNAME, cred.PA
 
 const app = express();
 
-const getVertices = (obj, args, context, info) => { 
-    const id = obj.id;
-    console.log(id);
-    // console.log(obj); // debug
-    // console.log(args); // debug
-
-    // return schema.find(course => {
-    //     return course.id === id;
-    // });
-
-    return "Hello";
-};
-
 const generateSchema = async function () {
     await schema.generateSchema();
     // console.log(schema.getGraphQLSchema().getTypeMap());
@@ -32,7 +19,7 @@ const generateSchema = async function () {
     }));
 
     app.listen(4000, () => {
-        console.log('Server is running');
+        console.log('Server is running on http://localhost:4000/graphql');
     });
 }
 

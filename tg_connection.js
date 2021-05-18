@@ -75,10 +75,11 @@ class TigerGraphConnection {
         if (vertexType === undefined) {
             throw new Error('Vertex type must be provided to delete vertices.');
         }
-        let url = this.RESTPORT + '/graph/' + this.GRAPH_NAME + '/vertices' + vertexType;
+        let url = this.RESTURL + '/graph/' + this.GRAPH_NAME + '/vertices/' + vertexType;
         if (vertexId) {
             url += '/' + vertexId;
         }
+        console.log(url);
         return axios.delete(url, {
             headers: this.HEADERS
         });
@@ -88,7 +89,7 @@ class TigerGraphConnection {
         if (sourceVertexId === undefined && sourceVertexType === undefined) {
             throw new Error('Both source vertex type and source vertex ID must be provided.');
         }
-        let url = this.RESTPORT + '/graph/' + this.GRAPH_NAME + '/edges/' + sourceVertexType + '/' + sourceVertexId;
+        let url = this.RESTURL + '/graph/' + this.GRAPH_NAME + '/edges/' + sourceVertexType + '/' + sourceVertexId;
         if (edgeType) {
             url += '/' + edgeType;
             if (targetVertexType) {
@@ -102,6 +103,12 @@ class TigerGraphConnection {
             url += '?limit=' + limit;
         }
         return axios.delete(url, {
+            headers: this.HEADERS
+        });
+    }
+
+    upsertData(data) {
+        return axios.post(this.RESTURL + '/graph/' + this.GRAPH_NAME, data, {
             headers: this.HEADERS
         });
     }
