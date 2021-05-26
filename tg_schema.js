@@ -7,18 +7,23 @@ const { GraphQLObjectType,
     GraphQLList,
     GraphQLInt,
 } = require('graphql');
+const { GraphQLJSON } = require('graphql-scalars');
+const { makeExecutableSchema } = require('graphql-tools');
+const { stitchSchemas } = require('graphql-tools');
 
 
 class TGSchema {
     constructor(host, graph_name, username, password, secret, token) {
         this.conn = new tg.TigerGraphConnection(host, graph_name, username, password, secret, token);
+        //vertices object dictinary: {key: vertex name, value: vertex graphql object}
         this.verticesObjectsDict = {};
         this.edgesObjectsDict = {};
+        this.TGSubSchema = [];
         this.graphQLSchema = undefined;
         this.udtType = {};
         this.rootQuery = undefined;
         this.mutation = undefined;
-        //
+        //store edge's source vertex id type and target vertex id type: {key: edgeName, value: {{from_id_type: type}, {to_id_type: type}}}
         this.vertexTypeInEdge = {};
         //attributesObjectDict: {key: vertex/edge name, value: attributes object}
         this.attributesObjectDict = {};
@@ -141,7 +146,7 @@ class TGSchema {
             keyField['type'] = new GraphQLList(value);
             keyField['resolve'] = async () => {
                 return await this.conn.getVertices(key).then(res => {
-                    // console.log(res.data.results);
+                    console.log(res.data.results);
                     return res.data.results;
                 });
             };
@@ -158,7 +163,7 @@ class TGSchema {
             // console.log(GraphQLString);
             keyField1['resolve'] = async (_, args) => {
                 return await this.conn.getVertices(key, args.id).then(res => {
-                    // console.log(res.data.results[0]);
+                    console.log(res.data.results[0]);
                     return res.data.results[0];
                 });
             };
@@ -295,10 +300,9 @@ class TGSchema {
                     for (const [key, value] of Object.entries(attributes.getFields())) {
                         // console.log(key + ' ' + value);
                         // console.log(args[key]);
-                        att[key] = {'value': args[key]};
+                        att[key] = { 'value': args[key] };
                     }
                 }
-                console.log(att);
                 let json = {};
                 json['vertices'] = {};
                 json['vertices'][key] = {};
@@ -306,7 +310,7 @@ class TGSchema {
                 // json['vertices'][key][args.vertexId] = att;
                 console.log(json);
                 return this.conn.upsertData(JSON.stringify(json))
-                    .then(res => { return res.data })
+                    .then(res => { return res.data; })
                     .catch(err => {
                         console.log(err.message);
                         throw new Error('Fail to upsert vertex');
@@ -378,7 +382,7 @@ class TGSchema {
             if (attributes !== undefined) {
                 let att = attributes.getFields();
                 for (const [key, value] of Object.entries(att)) {
-                    key3['args'][key] = {type: value.type};
+                    key3['args'][key] = { type: value.type };
                 }
             }
             key3['resolve'] = (_, args) => {
@@ -413,6 +417,51 @@ class TGSchema {
         return mutation;
     }
 
+    buildResolvers(queryName) {
+        const resolvers = { JSON: GraphQLJSON };
+        const query = {};
+        queryName.map(name => {
+            query[name] = async (_, args) => {
+                let TGQueryResultName = undefined;
+                if (args.hasOwnProperty('TGQueryResultName')) {
+                    TGQueryResultName = args.TGQueryResultName;
+                    delete args['TGQueryResultName'];
+                }
+                return await this.conn.runInstalledQuery(name, args)
+                    .then(res => {
+                        let result = res.data.results[0][TGQueryResultName];
+                        if (result === undefined) {
+                            throw new Error('Provide wrong query result name on tgcloud');
+                        }
+                        return result;
+                    }).catch(err => {
+                        throw new Error('Fail to run installed query.' + err.message);
+                    });
+            }
+        });
+        resolvers['Query'] = query;
+        return resolvers;
+    }
+
+    /**
+     * params are the dictinary of target gsql query parameters
+     * @param {*} typeDefs 
+     * @param {*} queryName as array
+     */
+    buildQuerySchema(typeDefs, queryName) {
+        let resolvers = this.buildResolvers(queryName);
+        const subschema = makeExecutableSchema({
+            typeDefs,
+            resolvers
+        });
+        console.log(subschema);
+        this.TGSubSchema.push(subschema);
+        // console.log(this.TGSubSchema);
+        this.graphQLSchema = stitchSchemas({
+            subschemas: this.TGSubSchema
+        });
+    }
+
     /**
      * generate schema for vertices and edges
      * @returns 
@@ -425,11 +474,15 @@ class TGSchema {
         }
         await this.conn.getSchema()
             .then(res => {
+                //get udt type objects
                 let udts = res.data.results.UDTs;
                 this.createUDTGraphQLObject(udts);
+
                 let vertices = res.data.results.VertexTypes;
                 let edges = res.data.results.EdgeTypes;
+                //generate vertex objects
                 this.generateVertexObjects(vertices);
+                //generate edge objectd
                 this.generateEdgeObjects(edges);
             });
         if (this.rootQuery === undefined) {
@@ -438,12 +491,14 @@ class TGSchema {
         if (this.mutation === undefined) {
             this.mutation = this.createMutation();
         }
-        if (this.graphQLSchema === undefined) {
-            this.graphQLSchema = new GraphQLSchema({
-                query: this.rootQuery,
-                mutation: this.mutation
-            });
-        }
+        const subschema = new GraphQLSchema({
+            query: this.rootQuery,
+            mutation: this.mutation
+        });
+        this.TGSubSchema.push(subschema);
+        this.graphQLSchema = stitchSchemas({
+            subschemas: this.TGSubSchema
+        });
     }
 
     getVerticesObjectsDict() {

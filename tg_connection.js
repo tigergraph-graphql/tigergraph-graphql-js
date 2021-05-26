@@ -112,6 +112,16 @@ class TigerGraphConnection {
             headers: this.HEADERS
         });
     }
+
+    runInstalledQuery(queryName, params = undefined, timeout = 16000, sizeLimit = 32000000) {
+        if (queryName === undefined) {
+            throw new Error('Query name should be provided');
+        }
+        return axios.get(this.RESTURL + '/query/' + this.GRAPH_NAME + '/' + queryName, {
+            params: params,
+            headers: this.HEADERS
+        });
+    }
 }
 
 exports.TigerGraphConnection = TigerGraphConnection;

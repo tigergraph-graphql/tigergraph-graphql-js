@@ -11,10 +11,35 @@ const app = express();
 const generateSchema = async function () {
     await schema.generateSchema();
     // console.log(schema.getGraphQLSchema().getTypeMap());
+    console.log(schema.getVerticesObjectsDict());
+
+
+    /**
+     * when query from TigerGraph installed query, 
+     * user can get vertex type from schema's function getVerticesObjectsDict()
+     */
+    const typeDefs = `
+     scalar JSON
+     type edgeSet {
+       e_type: String
+       from_id: String
+       from_type: String
+       to_id: String
+       to_type: String
+       directed: Boolean
+       attributes: JSON
+     }
+   
+     type Query {
+       discoverSocialConnections(A: String!, B: String!, k: Int, TGQueryResultName: String): [edgeSet]
+     }
+   `;
+
+   let queryName = ['discoverSocialConnections'];
+   schema.buildQuerySchema(typeDefs, queryName);
+
     app.use('/graphql', graphqlHTTP({
         schema: schema.getGraphQLSchema(),
-        // context: {},
-        // // rootValue: { vertex: getVertices },
         graphiql: true
     }));
 
