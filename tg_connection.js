@@ -35,8 +35,6 @@ class TigerGraphConnection {
                 password: this.PASSWORD
             }
         });
-        //.then(res => console.log(res.data))
-        //.catch(err => console.log(err));
     }
 
     getVertices(vertexName, vertexId = undefined) {
@@ -71,35 +69,49 @@ class TigerGraphConnection {
         });
     }
 
-    deleteVertices(vertexType, vertexId = undefined, where  = undefined, limit  = undefined) {
+    deleteVertices(vertexType, vertexId = undefined, where  = undefined, limit  = undefined, sort = undefined) {
         if (vertexType === undefined) {
             throw new Error('Vertex type must be provided to delete vertices.');
         }
         let url = this.RESTURL + '/graph/' + this.GRAPH_NAME + '/vertices/' + vertexType;
-        if (vertexId) {
+        if (vertexId !== undefined) {
             url += '/' + vertexId;
         }
-        console.log(url);
+        let isFisrt = true;
+        if (where !== undefined) {
+            url += '?filter=' + where;
+            isFisrt = false;
+        }
+        if (limit !== undefined) {
+            if (isFisrt) {
+                url += '?';
+            }
+            else {
+                url += '&';
+            }
+            url += 'limit=' + limit + '&sort=' + sort;
+        }
         return axios.delete(url, {
             headers: this.HEADERS
         });
     }
 
+
     deleteEdges(sourceVertexType, sourceVertexId, edgeType = undefined, targetVertexType = undefined, targetVertexId = undefined, limit = undefined) {
-        if (sourceVertexId === undefined && sourceVertexType === undefined) {
+        if (sourceVertexId === undefined || sourceVertexType === undefined) {
             throw new Error('Both source vertex type and source vertex ID must be provided.');
         }
         let url = this.RESTURL + '/graph/' + this.GRAPH_NAME + '/edges/' + sourceVertexType + '/' + sourceVertexId;
-        if (edgeType) {
+        if (edgeType !== undefined) {
             url += '/' + edgeType;
-            if (targetVertexType) {
+            if (targetVertexType !== undefined) {
                 url += '/' + targetVertexType;
-                if (targetVertexId) {
+                if (targetVertexId !== undefined) {
                     url += '/' + targetVertexId;
                 }
             }
         }
-        if (limit) {
+        if (limit !== undefined) {
             url += '?limit=' + limit;
         }
         return axios.delete(url, {

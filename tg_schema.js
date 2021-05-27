@@ -1,11 +1,11 @@
 const tg = require('./tg_connection');
-const cred = require('./config');
 const { GraphQLBasicTypeMapper, customizeGraphQLList, customizeGraphQLMap } = require('./type_mapper');
 const { GraphQLObjectType,
     GraphQLString,
     GraphQLSchema,
     GraphQLList,
     GraphQLInt,
+    GraphQLNonNull,
 } = require('graphql');
 const { GraphQLJSON } = require('graphql-scalars');
 const { makeExecutableSchema } = require('graphql-tools');
@@ -17,9 +17,12 @@ class TGSchema {
         this.conn = new tg.TigerGraphConnection(host, graph_name, username, password, secret, token);
         //vertices object dictinary: {key: vertex name, value: vertex graphql object}
         this.verticesObjectsDict = {};
+        //edges object dictionary: {key: edges name, value: edges graphql object}
         this.edgesObjectsDict = {};
+        //store sub schema including auto-generated and 
         this.TGSubSchema = [];
         this.graphQLSchema = undefined;
+        //store tg user define type 
         this.udtType = {};
         this.rootQuery = undefined;
         this.mutation = undefined;
@@ -44,9 +47,11 @@ class TGSchema {
         attributes.map(att => {
             let attName = att.AttributeName;
             let attType = att.AttributeType;
+            //attributes with basic type
             if (Object.keys(attType).length === 1) {
                 fields[attName] = { type: GraphQLBasicTypeMapper(attType.Name) };
             }
+            //attributes with List, Set, or UDT
             else if (Object.keys(attType).length == 2) {
                 if (attType.name === 'UDT') {
                     fields[attName] = { type: this.udtType[attType.TupleName] };
@@ -55,6 +60,7 @@ class TGSchema {
                     fields[attName] = { type: customizeGraphQLList(attType.ValueTypeName) };
                 }
             }
+            //attributes with Map
             else if (Object.keys(attType).length == 3) {
                 fields[attName] = { type: customizeGraphQLMap(attType.KeyTypeName, attType.ValueTypeName) };
             }
@@ -89,13 +95,10 @@ class TGSchema {
                     fields['attributes'] = { type: this.createAttributesType(vertexName, attributes) };
                 }
             }
-            // console.log(vertexName + ': fields: ');
-            // console.log(fields);
             const graphQLObject = new GraphQLObjectType({
                 name: vertexName,
                 fields: () => (fields)
             });
-            // console.log(graphQLObject);
             this.verticesObjectsDict[vertexName] = graphQLObject;
         });
     }
@@ -113,10 +116,8 @@ class TGSchema {
             this.vertexTypeInEdge[edgeName] = { 'from_id_type': this.verticesObjectsDict[fromVertexType].getFields()['v_id']['type'], 'to_id_type': this.verticesObjectsDict[toVertexType].getFields()['v_id']['type'] };
             fields['e_type'] = { type: GraphQLString };
             fields['directed'] = { type: GraphQLBasicTypeMapper('BOOL') };
-            //!!! id type could not be GraphQLString
             fields['from_type'] = { type: GraphQLString };
             fields['from_id'] = { type: this.verticesObjectsDict[fromVertexType].getFields()['v_id']['type'] };
-            //!!! id type could not be GraphQLString
             fields['to_id'] = { type: this.verticesObjectsDict[toVertexType].getFields()['v_id']['type'] };
             fields['to_type'] = { type: GraphQLString };
             if (edge.Attributes === undefined || edge.Attributes.length !== 0) {
@@ -126,7 +127,6 @@ class TGSchema {
                 name: edgeName,
                 fields: () => (fields)
             });
-            // console.log(edgeObject);
             this.edgesObjectsDict[edgeName] = edgeObject;
         });
     }
@@ -146,7 +146,6 @@ class TGSchema {
             keyField['type'] = new GraphQLList(value);
             keyField['resolve'] = async () => {
                 return await this.conn.getVertices(key).then(res => {
-                    console.log(res.data.results);
                     return res.data.results;
                 });
             };
@@ -158,12 +157,9 @@ class TGSchema {
             let keyField1 = {};
             keyField1['type'] = value;
             //id should be retreived type 
-            keyField1['args'] = { 'id': { type: GraphQLString } };
-            // console.log(keyField1);
-            // console.log(GraphQLString);
+            keyField1['args'] = { 'id': { type: GraphQLNonNull(GraphQLString) } };
             keyField1['resolve'] = async (_, args) => {
                 return await this.conn.getVertices(key, args.id).then(res => {
-                    console.log(res.data.results[0]);
                     return res.data.results[0];
                 });
             };
@@ -172,36 +168,23 @@ class TGSchema {
 
         //edges query 
         for (const [key, value] of Object.entries(this.edgesObjectsDict)) {
-            //fetch by source vertexType & vertexID
-            let key1 = {};
-            key1['type'] = new GraphQLList(value);
-            key1['args'] = {
-                'sourceVertexType': { type: GraphQLString },
-                'sourceVertexId': { type: this.vertexTypeInEdge[key]['from_id_type'] }
-            };
-            key1['resolve'] = async (_, args) => {
-                return await this.conn.getEdges(args.sourceVertexType, args.sourceVertexId, key)
-                    .then(res => { return res.data.results });
-            };
-            fields[key + 's'] = key1;
 
             //fetch by target vertexType and vertexID
             let key2 = {};
-            key2['type'] = value;
+            key2['type'] = new GraphQLList(value);
             key2['args'] = {
-                'sourceVertexType': { type: GraphQLString },
-                'sourceVertexId': { type: this.vertexTypeInEdge[key]['from_id_type'] },
+                'sourceVertexType': { type: GraphQLNonNull(GraphQLString) },
+                'sourceVertexId': { type: GraphQLNonNull(this.vertexTypeInEdge[key]['from_id_type']) },
                 'targetVertexType': { type: GraphQLString },
                 'targetVertexId': { type: this.vertexTypeInEdge[key]['to_id_type'] }
             };
             key2['resolve'] = async (_, args) => {
                 return await this.conn.getEdges(args.sourceVertexType, args.sourceVertexId, key, args.targetVertexType, args.targetVertexId)
-                    .then(res => { return res.data.results[0] });
+                    .then(res => { return res.data.results });
             }
             fields[key] = key2;
         }
 
-        // console.log(fields);
         this.rootQuery = new GraphQLObjectType({
             name: 'rootQuery',
             fields: fields
@@ -239,36 +222,50 @@ class TGSchema {
         /**
          * iterate vertices
          */
+        const delVertexResult = new GraphQLObjectType({
+            name: 'delVertexResult',
+            fields: () => ({
+                v_type: {type: GraphQLString},
+                deleted_vertices: {type: GraphQLInt}
+            })
+        });
         for (const [key, value] of Object.entries(this.verticesObjectsDict)) {
             //delete vertices
             let key1 = {};
-            key1['type'] = new GraphQLList(value);
+            key1['type'] = delVertexResult;
             key1['args'] = {
                 filter: { type: GraphQLString },
-                limit: { type: GraphQLInt }
+                limit: { type: GraphQLInt },
+                sort: { type: GraphQLString }
             }
             key1['resolve'] = async (_, args) => {
-                return this.conn.deleteVertices(key, undefined, args.filter, args.limit)
-                    .then(res => { return res.data })
-                    .catch(err => {
+                return this.conn.deleteVertices(key, undefined, args.filter, args.limit, args.sort)
+                    .then(res => { 
+                        if (res.data.error) {
+                            throw new Error(res.data.message);
+                        }
+                        console.log(res.data); 
+                        return res.data.results; 
+                    }).catch(err => {
                         console.log(err);
                         throw new Error('Fail to delete vertices');
                     });
             }
             fields['del' + key + 's'] = key1;
 
-            //delete vertex by ids
+            //delete vertex by id
             let key2 = {};
-            key2['type'] = value;
+            key2['type'] = delVertexResult;
             key2['args'] = {
-                vertex_id: { type: value.getFields()['v_id']['type'] },
-                filter: { type: GraphQLString },
-                limit: { type: GraphQLString }
+                vertexId: { type: GraphQLNonNull(value.getFields()['v_id']['type']) },
             }
             key2['resolve'] = async (_, args) => {
-                return this.conn.deleteVertices(key, args.id, args.filter, args.limit)
+                return this.conn.deleteVertices(key, args.vertexId)
                     .then(res => {
-                        return res.data;
+                        if (res.data.error) {
+                            throw new Error(res.data.message);
+                        }
+                        return res.data.results;
                     })
                     .catch(err => {
                         console.log(err.message);
@@ -298,8 +295,6 @@ class TGSchema {
                 let att = {};
                 if (attributes !== undefined) {
                     for (const [key, value] of Object.entries(attributes.getFields())) {
-                        // console.log(key + ' ' + value);
-                        // console.log(args[key]);
                         att[key] = { 'value': args[key] };
                     }
                 }
@@ -307,8 +302,6 @@ class TGSchema {
                 json['vertices'] = {};
                 json['vertices'][key] = {};
                 json['vertices'][key][args.vertexId] = att;
-                // json['vertices'][key][args.vertexId] = att;
-                console.log(json);
                 return this.conn.upsertData(JSON.stringify(json))
                     .then(res => { return res.data; })
                     .catch(err => {
@@ -319,50 +312,40 @@ class TGSchema {
             fields['upsertVertex' + key] = key3;
         }
 
+        const delEdgeResult = new GraphQLObjectType({
+            name: 'delEdgeResult',
+            fields: () => ({
+                e_type: { type: GraphQLString },
+                deleted_edges: { type: GraphQLInt }
+            })
+        });
         /**
          * iterate edges
          */
         for (const [key, value] of Object.entries(this.edgesObjectsDict)) {
             //delete all qualified edges by sourceVertex&id
             let key1 = {};
-            key1['type'] = new GraphQLList(value);
+            key1['type'] = new GraphQLList(delEdgeResult);
             key1['args'] = {
-                sourceVertex: { type: GraphQLString },
-                sourceVertexId: { type: this.vertexTypeInEdge[key]['from_id_type'] },
-            }
-            key1['resolve'] = (_, args) => {
-                this.conn.deleteEdges(args.sourceVertex, args.sourceVertexId, key)
-                    .then(res => {
-                        return res.data;
-                    })
-                    .catch(err => {
-                        console.log(err.message);
-                        throw new Error('fail to delete edges by source vertex and its id');
-                    });
-            }
-            fields['delEdges' + key + 'bySourceVertex'] = key1;
-
-            //delete edges by sourceVertex and targetVertex
-            //delete all qualified edges by sourceVertex&id
-            let key2 = {};
-            key2['type'] = new GraphQLList(value);
-            key2['args'] = {
-                sourceVertex: { type: GraphQLString },
-                sourceVertexId: { type: this.vertexTypeInEdge[key]['from_id_type'] },
-                targetVertex: { type: GraphQLString },
+                sourceVertexType: { type: GraphQLNonNull(GraphQLString) },
+                sourceVertexId: { type: GraphQLNonNull(this.vertexTypeInEdge[key]['from_id_type']) },
+                targetVertexType: { type: GraphQLString },
                 targetVertexId: { type: this.vertexTypeInEdge[key]['to_id_type'] },
             }
-            key2['resolve'] = (_, args) => {
-                this.conn.deleteEdges(args.sourceVertex, args.sourceVertexId, key, args.targetVertex, args.targetVertexId)
+            key1['resolve'] = (_, args) => {
+                return this.conn.deleteEdges(args.sourceVertexType, args.sourceVertexId, key, args.targetVertexType, args.targetVertexId)
                     .then(res => {
-                        return res.data;
+                        if (res.data.error) {
+                            throw new Error(res.data.message);
+                        }
+                        return res.data.results;
                     })
                     .catch(err => {
                         console.log(err.message);
                         throw new Error('fail to delete edges by source vertex and its id');
                     });
             }
-            fields['delEdges' + key + 'bySourceVertex'] = key2;
+            fields['delEdges' + key] = key1;
 
             //upsert edge into graph
             /**
@@ -420,6 +403,9 @@ class TGSchema {
     buildResolvers(queryName) {
         const resolvers = { JSON: GraphQLJSON };
         const query = {};
+        if (queryName === undefined) {
+            throw new Error('Please provide graphql query name');
+        }
         queryName.map(name => {
             query[name] = async (_, args) => {
                 let TGQueryResultName = undefined;
@@ -448,15 +434,17 @@ class TGSchema {
      * @param {*} typeDefs 
      * @param {*} queryName as array
      */
-    buildQuerySchema(typeDefs, queryName) {
+    buildInstalledQuerySchema(typeDefs, queryName) {
+        if (this.conn === undefined) {
+            console.log("tgconnection is null");
+            throw new Error("TigerGraph connection is not established!");
+        }
         let resolvers = this.buildResolvers(queryName);
         const subschema = makeExecutableSchema({
             typeDefs,
             resolvers
         });
-        console.log(subschema);
         this.TGSubSchema.push(subschema);
-        // console.log(this.TGSubSchema);
         this.graphQLSchema = stitchSchemas({
             subschemas: this.TGSubSchema
         });
@@ -466,11 +454,10 @@ class TGSchema {
      * generate schema for vertices and edges
      * @returns 
      */
-    async generateSchema() {
-        //should be throw an error
+    async autoGeneratedSchema() {
         if (this.conn === undefined) {
             console.log("tgconnection is null");
-            return;
+            throw new Error("TigerGraph connection is not established!");
         }
         await this.conn.getSchema()
             .then(res => {
@@ -484,6 +471,9 @@ class TGSchema {
                 this.generateVertexObjects(vertices);
                 //generate edge objectd
                 this.generateEdgeObjects(edges);
+            }).catch(err => {
+                console.log(err.message);
+                throw new Error('Fail to get Graph Schema from tgcloud.');
             });
         if (this.rootQuery === undefined) {
             this.generateRootQuery();
