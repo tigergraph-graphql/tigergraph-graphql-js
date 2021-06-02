@@ -1,9 +1,5 @@
 name: TigerGraph-GraphQL.js CI
 
-runs:
-  using: 'node12'
-  main: 'test.js'
-
 on:
   push:
     branches: [ main ]
