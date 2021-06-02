@@ -1,0 +1,14 @@
+name: 'TigerGraph-GraphQL.js action'
+description: 'Thank you to new  pull requests'
+
+inputs:
+  GITHUB_TOKEN:
+    description: 'Github token'
+    required: true
+  TENOR_TOKEN:
+    description: 'Tenor API token'
+    required: true
+
+runs:
+  using: 'node12'
+  main: 'dist/index.js'

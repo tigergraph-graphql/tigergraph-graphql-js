@@ -1,0 +1,20 @@
+name: TigerGraph-GraphQL.js CI
+
+runs:
+  using: 'node12'
+  main: 'test.js'
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      -name: Checkout
+      uses: actions/checkout@v2
+      -uses: ./
