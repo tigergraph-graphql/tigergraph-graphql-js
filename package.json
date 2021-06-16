@@ -2,7 +2,7 @@
   "name": "tigergraph-graphql",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "test/test.js",
   "scripts": {
     "build": "ncc build test/test.js -o dist",
     "test": "mocha test/test.js --exit"
