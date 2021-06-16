@@ -13,13 +13,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      # - name: Use NodeJS
-      #   uses: actions/setup-node@v1
-      #   with:
-      #     node-version: "12.x"
-      # - run: npm CI
-      # - run: | 
-      #     npm install
-      #     npm test
-      #   env:
-      #     CI: true
+      - name: Use NodeJS
+        uses: actions/setup-node@v1
+        with:
+          node-version: "12.x"
+      - run: npm CI
+      - run: | 
+          npm install
+          npm test
+        env:
+          CI: true
+
+  # deploy:
+  #   needs: [test]
+  #   runs-on: ubuntu-latest
