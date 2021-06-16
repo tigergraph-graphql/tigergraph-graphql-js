@@ -32,6 +32,12 @@ const customizeGraphQLList = (valueType = undefined) => {
     return new GraphQLList(GraphQLBasicTypeMapper(valueType));
 }
 
+/**
+ * build for TigerGraph Map type
+ * @param {*} keyType 
+ * @param {*} valueType 
+ * @returns 
+ */
 const customizeGraphQLMap = (keyType = undefined, valueType = undefined) => {
     if (keyType === undefined || valueType === undefined) {
         throw new Error('Value type or key type is not defined when creating GraphQLMap');
@@ -46,6 +52,11 @@ const customizeGraphQLMap = (keyType = undefined, valueType = undefined) => {
     return GraphQLMap;
 }
 
+/**
+ * 
+ * @param {type mapper} t 
+ * @returns 
+ */
 const TypeMapper = t => {
     const mapping = {
         'INT': 'number',

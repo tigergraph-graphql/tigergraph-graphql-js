@@ -408,6 +408,7 @@ class TGSchema {
         }
         queryName.map(name => {
             query[name] = async (_, args) => {
+                console.log(args);
                 let TGQueryResultName = undefined;
                 if (args.hasOwnProperty('TGQueryResultName')) {
                     TGQueryResultName = args.TGQueryResultName;

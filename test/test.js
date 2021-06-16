@@ -23,21 +23,21 @@ const generateSchema = async () => {
   const typeDefs = `
  scalar JSON
  type edgeSet {
+   attributes: JSON
+   directed: Boolean
    e_type: String
    from_id: String
-   from_type: String
    to_id: String
+   from_type:String
    to_type: String
-   directed: Boolean
-   attributes: JSON
  }
 
  type Query {
-   discoverSocialConnections(A: String!, B: String!, k: Int, TGQueryResultName: String): [edgeSet]
+   getClaims(inputPrescriber: String!, TGQueryResultName: String): [edgeSet]
  }
 `;
 
-  let queryName = ['discoverSocialConnections'];
+  let queryName = ['getClaims'];
   buildInstalledQuerySchema(typeDefs, queryName);
 
   app.use('/graphql', graphqlHTTP({

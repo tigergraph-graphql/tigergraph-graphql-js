@@ -1,10 +1,10 @@
 const cred = {
     HOST: "graphql.i.tgcloud.io",
-    GRAPH: 'connectivity',
+    GRAPH: 'MyGraph',
     USERNAME: 'tigergraph',
     PASSWORD: '123456',
-    SECRET: '99p3nvo8kd177u9b7hc9u5bbap4kt5bg',
-    TOKEN: '096r4ni1rqqotsshjfpfueedo9ll7unb'
+    SECRET: 'msl9a368jtlq3d61obocq8re10enhk2o',
+    TOKEN: '4qjpe53vmrm7s3gdqq7btjbmg6g5se54'
 }
 
 module.exports = cred;
